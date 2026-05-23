@@ -1,0 +1,18 @@
+world:
+  size: 100
+  ground_color: [0.3, 0.6, 0.3, 1.0]
+
+agents:
+  count: 5
+  speed: 8.0
+  size: 1.0
+  color: [0.8, 0.2, 0.2, 1.0]
+
+lod:
+  near: 30.0
+  far: 80.0
+
+simulation:
+  headless: false
+  export_path: "episodes/"
+  fps_overlay: true
