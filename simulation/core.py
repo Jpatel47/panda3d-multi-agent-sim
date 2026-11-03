@@ -1,7 +1,7 @@
 """Simulation core: builds the agents and steps them. Needs no window."""
 import random
 
-from panda3d.core import NodePath
+from panda3d.core import NodePath, RenderState, TransformState
 
 from agents.agent import Agent
 from behaviors.registry import create_behavior
@@ -43,3 +43,11 @@ class Simulation:
             agent.update(dt)
         self.steps += 1
         self.time += dt
+
+        # Every setPos creates a new TransformState, and Panda3D keeps the
+        # ones nothing references any more in a cache until garbageCollect()
+        # is called. ShowBase calls it once per frame; without a ShowBase
+        # (headless runs) the cache would grow by one state per agent per
+        # step and slow every later step down, so the core does it itself.
+        TransformState.garbageCollect()
+        RenderState.garbageCollect()

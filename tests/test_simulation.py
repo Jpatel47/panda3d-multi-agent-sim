@@ -1,6 +1,7 @@
 """Simulation core and viewer: config-driven setup and reproducible runs."""
 import pytest
 import yaml
+from panda3d.core import TransformState
 
 from behaviors.seek_target import SeekTarget
 from simulation.config import load_config
@@ -48,6 +49,19 @@ def test_step_advances_every_agent_and_the_clock(cfg):
     assert sim.steps == 10
     assert sim.time == pytest.approx(1.0)
     assert all(agent.steps == 10 for agent in sim.agents)
+
+
+def test_stepping_without_showbase_does_not_pile_up_transform_states(cfg):
+    # Regression: every setPos creates a TransformState, and Panda3D keeps
+    # unreferenced ones cached until TransformState.garbageCollect() runs.
+    # Only ShowBase ran it (once per frame), so headless runs cached one
+    # more state per agent per step and got slower as the cache grew.
+    sim = Simulation(cfg)
+    TransformState.garbageCollect()
+    before = TransformState.getNumStates()
+    for _ in range(1000):
+        sim.step(0.05)
+    assert TransformState.getNumStates() - before < 100
 
 
 def test_missing_seed_is_replaced_with_a_concrete_one(cfg, tmp_path):

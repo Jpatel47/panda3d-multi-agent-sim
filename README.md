@@ -4,8 +4,9 @@ A small multi-agent simulation written in Python on top of
 [Panda3D](https://www.panda3d.org/). Agents move around a square ground
 plane, each driven by a pluggable behavior that `config.yaml` selects.
 Every run can be reproduced from one seed. The simulation core needs no
-window, so the whole thing is unit-tested headless. A Panda3D viewer
-draws the agents as two-level LOD spheres.
+window. It can run headless with a fixed time step and export each run
+as a JSON episode file, and the whole thing is unit-tested headless. A
+Panda3D viewer draws the agents as two-level LOD spheres.
 
 ## Setup
 
@@ -33,6 +34,23 @@ example `seed=42 behavior=random_walk agents=5`.
 | Arrow left / right | Move the camera left/right   |
 | Q                  | Quit                         |
 
+### Headless runs and episode export
+
+```bash
+python main.py --headless                        # 600 steps of 0.05 s, seed 42
+python main.py --headless --steps 2000 --seed 7 --dt 0.02
+python main.py --headless --export-path /tmp/episodes --config my_config.yaml
+```
+
+A headless run opens no window and does not create a ShowBase. It
+steps the simulation `simulation.steps` times by the fixed
+`simulation.dt` and writes the episode to
+`<export_path>/episode_<behavior>_seed<seed>.json`. Each flag overrides
+the matching key under `simulation:` in the config. `--no-headless`
+forces the viewer even when the config says `headless: true`. Run
+`python main.py --help` for the full list. Only headless runs record
+episodes; the viewer does not.
+
 ## Tests
 
 ```bash
@@ -48,10 +66,12 @@ every pull request.
 ## Architecture
 
 ```
-main.py                   entry point: load config, build Simulation, open the viewer
+main.py                   command line: load config, apply flags, run headless or open the viewer
 config.yaml               every tuneable parameter
 simulation/config.py      load_config(): parse the YAML once; fill in a seed if it is null
 simulation/core.py        Simulation: build agents from the config, step(dt); no window
+simulation/headless.py    run_headless(): fixed-dt run of N steps, recorded frame by frame
+simulation/logger.py      EpisodeLogger: per-step agent records, written as one JSON file
 simulation/world.py       SimulationWorld (ShowBase): ground, lights, camera, FPS overlay;
                           steps the Simulation once per rendered frame
 agents/agent.py           Agent: position, velocity, heading; moves at up to agents.speed
@@ -81,6 +101,36 @@ only match if their frame times match.
 `behaviors/registry.py`. If it has parameters, override `from_config` to
 read them from `cfg["behaviors"][name]`.
 
+## Episode files
+
+```json
+{
+  "schema_version": 1,
+  "metadata": {
+    "seed": 42, "behavior": "random_walk", "agent_count": 5,
+    "dt": 0.05, "steps": 600,
+    "config": {"...": "the full config of the run, command-line overrides included"}
+  },
+  "frames": [
+    {"step": 0, "time": 0.0, "agents": ["...spawn state of every agent..."]},
+    {"step": 1, "time": 0.05, "agents": [
+      {"id": 0, "behavior": "random_walk",
+       "position": [-15.167223, -15.355803, 1.0],
+       "velocity": [-7.991252, 0.374025], "heading": 177.320263},
+      "...one record per agent..."
+    ]},
+    "...one frame per step..."
+  ]
+}
+```
+
+(Values from the default config, seed 42.)
+
+- Frame `k` is the state after `k` steps. Frame 0 is the spawn state, so a run of N steps has N + 1 frames.
+- `position` is in world units; `z` is always the sphere radius, so agents stay on the ground. `velocity` is in units per second on the ground plane. `heading` is in degrees, counter-clockwise from +X, in `[0, 360)`. Values are rounded to 6 decimal places.
+- Re-running with the same config and flags on the same platform rewrites the file byte for byte (`tests/test_episode.py`).
+- With the defaults (5 agents, 600 steps) a file is about 390 KB.
+
 ## Configuration reference
 
 | Key | Default | Meaning |
@@ -97,10 +147,12 @@ read them from `cfg["behaviors"][name]`.
 | `behaviors.seek_target.arrive_radius` | `1.0` | Distance at which a target counts as reached |
 | `lod.near` | `30.0` | The near sphere is drawn up to this camera distance |
 | `lod.far` | `80.0` | The far sphere is drawn from `lod.near` to this distance; beyond it the agent is not drawn |
-| `simulation.seed` | `42` | Seed for all randomness; `null` draws a fresh seed, which is printed |
+| `simulation.seed` | `42` | Seed for all randomness; `null` draws a fresh seed, which is printed. Flag: `--seed` |
+| `simulation.headless` | `false` | `true` runs without a window and exports the episode. Flag: `--headless` / `--no-headless` |
+| `simulation.steps` | `600` | Headless: number of fixed steps. Flag: `--steps` |
+| `simulation.dt` | `0.05` | Headless: fixed time step in seconds. Flag: `--dt` |
+| `simulation.export_path` | `"episodes/"` | Headless: directory the episode JSON is written to (created if missing; `episodes/` is gitignored). Flag: `--export-path` |
 | `simulation.fps_overlay` | `true` | Show the FPS and agent count on screen |
-| `simulation.headless` | `false` | Not used yet (see Status) |
-| `simulation.export_path` | `"episodes/"` | Not used yet (see Status) |
 
 ## Status
 
@@ -109,12 +161,12 @@ Working:
 - Windowed viewer with a ground plane, lighting, arrow-key camera and an FPS overlay
 - Two behaviors, `random_walk` and `seek_target`, behind a common `Behavior` interface, chosen in `config.yaml`
 - Seeded, reproducible simulation core that runs without a window
+- Headless mode with a fixed time step and JSON episode export, configured in `config.yaml` or with command-line flags
 - Two-level LOD per agent
 - Headless pytest suite, run in GitHub Actions CI
 
 Planned, not implemented yet:
 
-- Headless mode and JSON episode export (`simulation.headless`, `simulation.export_path`)
 - Agent-agent collision detection
 - A cheaper far LOD level. Today both levels load the same sphere model and the far one is only drawn smaller, so it saves no rendering work.
 
