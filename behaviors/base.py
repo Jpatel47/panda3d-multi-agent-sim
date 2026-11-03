@@ -25,6 +25,14 @@ class Behavior(ABC):
         """
         return cls(rng)
 
+    def on_collision(self, agent, normal):
+        """React to the agent touching another agent.
+
+        Called after the agent has been pushed apart and its velocity
+        mirrored. `normal` is a unit vector on the ground plane pointing
+        from the other agent towards this one. The default does nothing.
+        """
+
     @abstractmethod
     def decide(self, agent, dt):
         """Return the desired move direction for this step.

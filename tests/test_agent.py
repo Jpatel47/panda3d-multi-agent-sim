@@ -6,20 +6,7 @@ import pytest
 from panda3d.core import LPoint3f, LVector3f, NodePath
 
 from agents.agent import Agent
-from behaviors.base import Behavior
-
-
-class Fixed(Behavior):
-    """Test behavior that always asks for the same direction."""
-
-    name = "fixed"
-
-    def __init__(self, direction):
-        super().__init__(rng=None)
-        self.direction = LVector3f(*direction)
-
-    def decide(self, agent, dt):
-        return LVector3f(self.direction)
+from helpers import Fixed
 
 
 def _agent(cfg, direction=None, seed=0):

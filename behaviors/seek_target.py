@@ -40,6 +40,11 @@ class SeekTarget(Behavior):
         offset.z = 0.0
         return offset
 
+    def on_collision(self, agent, normal):
+        # Another agent is in the way: give up on this target and pick a new
+        # one, instead of pushing into the other agent on every step.
+        self.target = self._new_target(agent)
+
     def decide(self, agent, dt):
         if self.target is None:
             self.target = self._new_target(agent)

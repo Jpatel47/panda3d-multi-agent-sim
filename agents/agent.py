@@ -37,6 +37,19 @@ class Agent:
     def set_behavior(self, behavior):
         self.behavior = behavior
 
+    def place(self, x, y):
+        """Move to (x, y), clamped to the world, on the ground plane."""
+        self.position = LPoint3f(max(-self.bound, min(self.bound, x)),
+                                 max(-self.bound, min(self.bound, y)),
+                                 self.radius)
+        self.node.setPos(self.position)
+
+    def _update_heading(self):
+        # Standing still keeps the previous heading.
+        if self.velocity.lengthSquared() > 0.0:
+            self.heading = math.degrees(
+                math.atan2(self.velocity.y, self.velocity.x)) % 360.0
+
     def update(self, dt):
         if self.behavior is None:
             return
@@ -48,14 +61,27 @@ class Agent:
         self.velocity = direction * self.speed
 
         new_pos = self.position + self.velocity * dt
-        new_pos.x = max(-self.bound, min(self.bound, new_pos.x))
-        new_pos.y = max(-self.bound, min(self.bound, new_pos.y))
-        new_pos.z = self.radius
-        self.position = new_pos
-
-        if self.velocity.lengthSquared() > 0.0:
-            self.heading = math.degrees(
-                math.atan2(self.velocity.y, self.velocity.x)) % 360.0
-
-        self.node.setPos(self.position)
+        self.place(new_pos.x, new_pos.y)
+        self._update_heading()
         self.steps += 1
+
+    def bounce(self, normal, distance):
+        """
+        Respond to touching another agent.
+
+        `normal` is a unit vector on the ground plane pointing from the
+        other agent towards this one. The agent is pushed `distance` along
+        it and, if it was moving towards the other agent, its velocity is
+        mirrored off the normal. The behavior is told last, so it can
+        change what it does on the next step.
+        """
+        pushed = self.position + normal * distance
+        self.place(pushed.x, pushed.y)
+
+        along = self.velocity.dot(normal)
+        if along < 0.0:
+            self.velocity = self.velocity - normal * (2.0 * along)
+            self._update_heading()
+
+        if self.behavior is not None:
+            self.behavior.on_collision(self, normal)

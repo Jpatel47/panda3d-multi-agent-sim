@@ -16,6 +16,9 @@ behaviors:
   seek_target:
     arrive_radius: 1.0      # pick a new target once this close to the current one
 
+collisions:
+  enabled: true             # detect touching agents, push them apart and bounce them
+
 lod:
   near: 30.0
   far: 80.0

@@ -58,6 +58,8 @@ def test_schema(cfg, tmp_path):
     assert meta["agent_count"] == count
     assert meta["dt"] == 0.1
     assert meta["steps"] == 40
+    assert meta["collision_count"] == sum(len(f["collisions"])
+                                          for f in episode["frames"])
     # The snapshot is the config the run actually used, overrides included.
     assert meta["config"]["simulation"]["seed"] == 3
     assert meta["config"]["simulation"]["steps"] == 40
@@ -66,7 +68,9 @@ def test_schema(cfg, tmp_path):
     frames = episode["frames"]
     assert len(frames) == 41                    # spawn state + one per step
     for k, frame in enumerate(frames):
-        assert set(frame) == {"step", "time", "agents"}
+        assert set(frame) == {"step", "time", "agents", "collisions"}
+        assert all(len(pair) == 2 and pair[0] < pair[1]
+                   for pair in frame["collisions"])
         assert frame["step"] == k
         assert frame["time"] == pytest.approx(k * 0.1)
         assert [a["id"] for a in frame["agents"]] == list(range(count))

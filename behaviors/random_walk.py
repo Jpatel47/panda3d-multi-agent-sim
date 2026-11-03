@@ -35,6 +35,13 @@ class RandomWalk(Behavior):
         angle = self.rng.uniform(0.0, 2.0 * math.pi)
         return LVector3f(math.cos(angle), math.sin(angle), 0.0)
 
+    def on_collision(self, agent, normal):
+        # Bounce: if the walk points into the other agent, mirror it off the
+        # contact normal so the next steps lead away from it.
+        along = self._direction.dot(normal)
+        if along < 0.0:
+            self._direction = self._direction - normal * (2.0 * along)
+
     def decide(self, agent, dt):
         self._elapsed += dt
         if self._elapsed >= self.change_interval:
