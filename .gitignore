@@ -35,3 +35,6 @@ episodes/
 dist/
 build/
 *.egg-info/
+
+# Test cache
+.pytest_cache/

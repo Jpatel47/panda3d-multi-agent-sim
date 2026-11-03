@@ -51,7 +51,7 @@ class Agent:
         if self.behavior is None:
             return
 
-        action = self.behavior.decide(self.state)
+        action = self.behavior.decide(self.state, dt)
         self.state["velocity"] = action * self.cfg["speed"]
 
         new_pos = self.state["position"] + self.state["velocity"] * dt
