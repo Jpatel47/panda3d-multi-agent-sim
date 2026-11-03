@@ -1,27 +1,16 @@
-import yaml
+from simulation.config import load_config
+from simulation.core import Simulation
 from simulation.world import SimulationWorld
-from agents.agent import Agent
-from behaviors.random_walk import RandomWalk
 
 
-def main():
-    with open("config.yaml", "r") as f:
-        cfg = yaml.safe_load(f)
+def main(config_path="config.yaml"):
+    # Read the config once and pass the same dict to everything.
+    cfg = load_config(config_path)
+    sim = Simulation(cfg)
+    print(f"seed={sim.seed} behavior={sim.behavior_name} "
+          f"agents={len(sim.agents)}")
 
-    world = SimulationWorld("config.yaml")
-
-    for i in range(cfg["agents"]["count"]):
-        agent = Agent(world, i, cfg["agents"])
-        agent.set_behavior(RandomWalk())
-        world.register_agent(agent)
-
-    def update_agents(task):
-        dt = globalClock.getDt()
-        for agent in world.agents:
-            agent.update(dt)
-        return task.cont
-
-    world.taskMgr.add(update_agents, "update_agents")
+    world = SimulationWorld(cfg, sim)
     world.run()
 
 

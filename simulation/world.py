@@ -2,25 +2,29 @@ from direct.showbase.ShowBase import ShowBase
 from panda3d.core import (
     AmbientLight, DirectionalLight,
     LVector4f, LPoint3f,
-    CardMaker, NodePath,
+    CardMaker,
     TextNode
 )
 from direct.gui.OnscreenText import OnscreenText
-import yaml
 import time
+
+from agents.visuals import attach_lod_model
 
 
 class SimulationWorld(ShowBase):
+    """Windowed viewer: draws a Simulation and steps it once per frame."""
 
-    def __init__(self, config_path="config.yaml"):
+    def __init__(self, cfg, simulation):
         ShowBase.__init__(self)
 
-        with open(config_path, "r") as f:
-            self.cfg = yaml.safe_load(f)
-
-        self.agents = []
+        self.cfg = cfg
+        self.sim = simulation
         self._frame_times = []
         self._last_time = time.time()
+
+        self.sim.root.reparentTo(self.render)
+        for agent in self.sim.agents:
+            attach_lod_model(agent, self.loader, cfg["agents"], cfg["lod"])
 
         self._setup_camera()
         self._setup_lighting()
@@ -29,9 +33,15 @@ class SimulationWorld(ShowBase):
         if self.cfg["simulation"]["fps_overlay"]:
             self._setup_fps_overlay()
 
+        self.taskMgr.add(self._step_simulation, "step_simulation")
         self.taskMgr.add(self._update, "main_update")
 
     def _setup_camera(self):
+        self.accept("q", self.userExit)
+        if self.camera is None:
+            # window-type none (used by the tests): ShowBase makes no camera.
+            return
+
         self.disableMouse()
         self.camera.setPos(0, -60, 40)
         self.camera.lookAt(LPoint3f(0, 0, 0))
@@ -40,7 +50,6 @@ class SimulationWorld(ShowBase):
         self.accept("arrow_down",  self._cam_back)
         self.accept("arrow_left",  self._cam_left)
         self.accept("arrow_right", self._cam_right)
-        self.accept("q",           self.userExit)
 
     def _cam_forward(self):
         self.camera.setY(self.camera, 5)
@@ -90,6 +99,11 @@ class SimulationWorld(ShowBase):
             align=TextNode.ALeft
         )
 
+    def _step_simulation(self, task):
+        # Step by the real time elapsed since the previous frame.
+        self.sim.step(self.clock.getDt())
+        return task.cont
+
     def _update(self, task):
         now = time.time()
         dt = now - self._last_time
@@ -103,9 +117,6 @@ class SimulationWorld(ShowBase):
             avg = sum(self._frame_times) / len(self._frame_times)
             fps = int(1.0 / avg) if avg > 0 else 0
             self._fps_text.setText(f"FPS: {fps}")
-            self._agent_text.setText(f"Agents: {len(self.agents)}")
+            self._agent_text.setText(f"Agents: {len(self.sim.agents)}")
 
         return task.cont
-
-    def register_agent(self, agent):
-        self.agents.append(agent)
