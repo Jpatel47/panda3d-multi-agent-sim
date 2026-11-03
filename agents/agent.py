@@ -1,48 +1,38 @@
-from panda3d.core import LPoint3f, LVector3f, LODNode, NodePath
-import random
+import math
+
+from panda3d.core import LPoint3f, LVector3f
 
 
 class Agent:
+    """
+    A point agent that moves on the ground plane.
 
-    def __init__(self, world, agent_id, config):
-        self.world = world
+    Each update it asks its behavior for a direction, moves at up to
+    agents.speed units per second, and is clamped so its sphere stays inside
+    the world square. `node` is a scene-graph node that follows the agent's
+    position; the viewer attaches the visible model to it.
+    """
+
+    def __init__(self, agent_id, cfg, parent, rng):
+        agents_cfg = cfg["agents"]
         self.agent_id = agent_id
-        self.cfg = config
+        self.speed = agents_cfg["speed"]
+        self.radius = agents_cfg["size"]
+        # Furthest the centre can get from the origin on x or y.
+        self.bound = cfg["world"]["size"] / 2 - self.radius
 
-        self.state = {
-            "position": LPoint3f(
-                random.uniform(-20, 20),
-                random.uniform(-20, 20),
-                0.5
-            ),
-            "velocity": LVector3f(0, 0, 0),
-            "reward": 0.0,
-            "step": 0
-        }
-
+        spawn = min(agents_cfg["spawn_range"], self.bound)
+        self.position = LPoint3f(rng.uniform(-spawn, spawn),
+                                 rng.uniform(-spawn, spawn),
+                                 self.radius)
+        self.velocity = LVector3f(0.0, 0.0, 0.0)
+        # Direction of travel in degrees, counter-clockwise from +X.
+        self.heading = 0.0
+        self.steps = 0
         self.behavior = None
-        self._setup_node()
 
-    def _setup_node(self):
-        size = self.cfg["size"]
-        color = self.cfg["color"]
-
-        lod = LODNode(f"agent_{self.agent_id}_lod")
-        self.lod_node = self.world.render.attachNewNode(lod)
-        self.lod_node.setPos(self.state["position"])
-
-        high = self.world.loader.loadModel("models/misc/sphere")
-        high.setScale(size)
-        high.setColor(color[0], color[1], color[2], color[3])
-        high.reparentTo(self.lod_node)
-        lod.addSwitch(self.world.cfg["lod"]["near"], 0)
-
-        low = self.world.loader.loadModel("models/misc/sphere")
-        low.setScale(size * 0.5)
-        low.setColor(color[0], color[1], color[2] + 0.3, color[3])
-        low.reparentTo(self.lod_node)
-        lod.addSwitch(self.world.cfg["lod"]["far"],
-                      self.world.cfg["lod"]["near"])
+        self.node = parent.attachNewNode(f"agent_{agent_id}")
+        self.node.setPos(self.position)
 
     def set_behavior(self, behavior):
         self.behavior = behavior
@@ -51,15 +41,21 @@ class Agent:
         if self.behavior is None:
             return
 
-        action = self.behavior.decide(self.state, dt)
-        self.state["velocity"] = action * self.cfg["speed"]
+        decided = self.behavior.decide(self, dt)
+        direction = LVector3f(decided.x, decided.y, 0.0)
+        if direction.lengthSquared() > 1.0:
+            direction.normalize()
+        self.velocity = direction * self.speed
 
-        new_pos = self.state["position"] + self.state["velocity"] * dt
-        half = self.world.cfg["world"]["size"] / 2 - 1
-        new_pos.x = max(-half, min(half, new_pos.x))
-        new_pos.y = max(-half, min(half, new_pos.y))
-        new_pos.z = 0.5
+        new_pos = self.position + self.velocity * dt
+        new_pos.x = max(-self.bound, min(self.bound, new_pos.x))
+        new_pos.y = max(-self.bound, min(self.bound, new_pos.y))
+        new_pos.z = self.radius
+        self.position = new_pos
 
-        self.state["position"] = new_pos
-        self.lod_node.setPos(new_pos)
-        self.state["step"] += 1
+        if self.velocity.lengthSquared() > 0.0:
+            self.heading = math.degrees(
+                math.atan2(self.velocity.y, self.velocity.x)) % 360.0
+
+        self.node.setPos(self.position)
+        self.steps += 1

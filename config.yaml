@@ -1,18 +1,27 @@
 world:
-  size: 100
+  size: 100                 # side length of the square ground plane
   ground_color: [0.3, 0.6, 0.3, 1.0]
 
 agents:
   count: 5
-  speed: 8.0
-  size: 1.0
+  speed: 8.0                # top speed, world units per second
+  size: 1.0                 # sphere radius
   color: [0.8, 0.2, 0.2, 1.0]
+  spawn_range: 20.0         # spawn uniformly in [-spawn_range, spawn_range] on x and y
+  behavior: random_walk     # one of the names in behaviors/registry.py
+
+behaviors:
+  random_walk:
+    change_interval: 1.0    # seconds of simulated time between direction changes
+  seek_target:
+    arrive_radius: 1.0      # pick a new target once this close to the current one
 
 lod:
   near: 30.0
   far: 80.0
 
 simulation:
+  seed: 42                  # all randomness derives from this; null = draw a new seed each run
   headless: false
   export_path: "episodes/"
   fps_overlay: true
