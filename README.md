@@ -12,7 +12,7 @@ spheres.
 
 ## Setup
 
-Python 3.9 or newer. CI runs the tests on Python 3.9 and 3.11.
+Python 3.9 or newer. CI runs the tests on Python 3.9, 3.11 and 3.13.
 
 ```bash
 python3 -m venv venv
