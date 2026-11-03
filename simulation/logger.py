@@ -4,7 +4,8 @@ import json
 import os
 
 # Bump when the layout of the episode file changes.
-SCHEMA_VERSION = 1
+# 2: per-frame "collisions" and metadata "collision_count".
+SCHEMA_VERSION = 2
 
 # Panda3D stores positions as 32-bit floats, which hold about 7 significant
 # digits. Six decimal places keeps that precision at this world scale
@@ -44,6 +45,7 @@ class EpisodeLogger:
             "agent_count": cfg["agents"]["count"],
             "dt": dt,
             "steps": 0,
+            "collision_count": 0,
             "config": copy.deepcopy(cfg),
         }
         self.frames = []
@@ -54,8 +56,12 @@ class EpisodeLogger:
             "step": sim.steps,
             "time": round(sim.time, DECIMALS),
             "agents": [agent_state(agent) for agent in sim.agents],
+            # Id pairs that touched during this step, after which they were
+            # pushed apart. Empty for frame 0.
+            "collisions": [list(pair) for pair in sim.last_collisions],
         })
         self.metadata["steps"] = sim.steps
+        self.metadata["collision_count"] = sim.collision_count
 
     def to_dict(self):
         return {

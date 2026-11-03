@@ -5,6 +5,7 @@ from panda3d.core import NodePath, RenderState, TransformState
 
 from agents.agent import Agent
 from behaviors.registry import create_behavior
+from simulation.collision import CollisionSystem
 
 
 class Simulation:
@@ -17,6 +18,11 @@ class Simulation:
 
     Agents live under `root`, a plain scene-graph node. The viewer parents
     it under ShowBase.render to draw it; without a viewer nothing renders.
+
+    With collisions.enabled, agents that touch after a step are pushed
+    apart and bounced (see simulation/collision.py). `last_collisions`
+    holds the (a, b) id pairs of the latest step and `collision_count`
+    the running total.
     """
 
     def __init__(self, cfg):
@@ -37,10 +43,19 @@ class Simulation:
             agent.set_behavior(create_behavior(self.behavior_name, rng, cfg))
             self.agents.append(agent)
 
+        self.collisions = None
+        if cfg["collisions"]["enabled"]:
+            self.collisions = CollisionSystem(self.agents, self.root)
+        self.last_collisions = []
+        self.collision_count = 0
+
     def step(self, dt):
-        """Advance every agent by dt seconds of simulated time."""
+        """Advance every agent by dt seconds, then resolve collisions."""
         for agent in self.agents:
             agent.update(dt)
+        if self.collisions is not None:
+            self.last_collisions = self.collisions.step()
+            self.collision_count += len(self.last_collisions)
         self.steps += 1
         self.time += dt
 
